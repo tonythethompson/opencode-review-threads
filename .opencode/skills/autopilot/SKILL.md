@@ -36,6 +36,14 @@ minutes), never the whole job timeout. Do not invent work because a pass came up
 empty.
 Read the PR diff only when a comment or CI failure needs code context.
 
+Tool round-trips dominate wall-clock: every call costs a full model turn, and the
+context grows with each result, so later turns run slower. Batch investigation —
+decide the minimal set of reads that covers all anchor locations up front, then
+issue them together (multiple `Read`/`Grep` calls in one turn) instead of
+discovering one file per turn. Prefer one broad `git diff`/`rg` that answers the
+question over a chain of narrow lookups, and re-derive what you need from earlier
+output rather than re-reading.
+
 Derive `owner`/`repo` from `baseRepository.nameWithOwner` in the `<pull_request>` context
 (split on `/`), `pr_number` from `Number:`, `HEAD_SHA` from `Head: { Sha: ... }`, and the
 head branch from `Head: { ref }`. `gh` is preinstalled and `GITHUB_TOKEN` is set.
