@@ -27,7 +27,7 @@ bash "$HOME/.config/opencode/scripts/review-pr-gh.sh" context
 
 `context` pins the repository, PR, base SHA, head SHA, review-base SHA, metadata, and changed-file set outside the untrusted checkout. If it succeeds, every later read, validation, and submission stays bound to that snapshot even when the live PR advances; outdated rendering is acceptable because the reviewed commit is explicit. Fail closed on incomplete GitHub comparison data.
 
-When the PR already carries a review authored by `opencode-agent[bot]` or `github-actions[bot]`, `review_base` is that review's head commit instead of the PR base, so `diff` and `metadata` cover only commits since the previous review. Findings already posted on unchanged code are out of scope; never re-raise them. If the pinned diff is empty because the head was already reviewed, report that no new changes require review instead of repeating earlier findings.
+When the PR already carries a review authored by `opencode-agent[bot]` or `github-actions[bot]`, `review_base` is that review's head commit instead of the PR base, so `diff` and `metadata` cover only commits since the previous review. Findings already posted on unchanged code are out of scope; never re-raise them. If the pinned diff is empty because the head was already reviewed, stop and emit only `<!-- opencode-review:clean -->`. Do not repeat earlier findings and do not describe the empty diff.
 
 Read the snapshot only through:
 
@@ -117,7 +117,7 @@ Before any PR-mode completion, including a clean result, run:
 bash "$HOME/.config/opencode/scripts/review-pr-gh.sh" validate
 ```
 
-If no confirmed findings or material verification notes remain, return exactly `No noteworthy issues found.` and do not submit an empty review.
+If no confirmed findings or material verification notes remain, your entire final message must be exactly `<!-- opencode-review:clean -->` and nothing else. Do not submit an empty review. Do not summarize the diff, list what you checked, or say that no code changes are needed. `opencode github run` posts that message, and the action deletes it so a clean review leaves the pull request unchanged.
 
 If confirmed findings or material verification notes remain but none has a valid inline anchor, return a concise markdown summary after snapshot validation and do not write `initial.json` or call the submission helper.
 
@@ -163,6 +163,6 @@ bash "$HOME/.config/opencode/scripts/review-pr-submit.sh" update
 
 The trusted helper derives repository, PR, pinned commit, review ID, endpoint, and authentication from trusted state; never pass or override them. If GitHub rejects an inline anchor at the API, fail rather than retrying with a different publication path; rejections the helper raises before posting may be fixed and resubmitted as described above.
 
-Your final assistant output is the canonical review summary; the action posts it as a follow-up comment on the pull request, after the review and its threads. Keep it an index, never a restatement: open with a link to the submitted review (the `submit-initial` response carries its `html_url`) and a one-line overall assessment; then one line per inline finding with file:line, severity, and short title, without repeating finding bodies; then an "Out of diff" section listing any `summary_only` findings and material verification notes with the file(s)/line(s) they cover. Since the review body stays a stub, this comment is the only place the summary appears and must stand alone.
+Your final assistant output is the canonical review summary; the action posts it as a follow-up comment on the pull request, after the review and its threads. That comment exists only when you submitted a review or you are returning an unanchored-findings summary. A clean result uses the sentinel above and must not include this index. Keep a findings summary an index, never a restatement: open with a link to the submitted review (the `submit-initial` response carries its `html_url`) and a one-line overall assessment; then one line per inline finding with file:line, severity, and short title, without repeating finding bodies; then an "Out of diff" section listing any `summary_only` findings and material verification notes with the file(s)/line(s) they cover. Since the review body stays a stub, this comment is the only place the summary appears and must stand alone.
 
 Do not clean, reset, restore, stash, commit, push, install dependencies, or run repository QA/format/generation commands as part of review.

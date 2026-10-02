@@ -71,7 +71,7 @@ A successful run validates the complete payload without a GitHub write, then cre
 
 If no finding can be anchored, the command returns a concise Markdown fallback instead of an empty review. Validation identifies missing or invalid fields before submission. Submission failures fail the workflow without a retry rather than risking an unintended review artifact or reposting findings as an unstructured comment.
 
-`opencode github run` may separately post the command's final completion message, so a run can produce the structured review plus at most one top-level completion comment.
+`opencode github run` may separately post the command's final completion message, so a run with findings can produce the structured review plus at most one top-level completion comment. A clean result (no confirmed findings and no material verification notes) is not left on the pull request: the command's final message is a sentinel the action deletes, including a narration that no code changes are needed.
 
 ## Incremental reviews
 
@@ -79,7 +79,7 @@ When the pull request already carries a submitted review authored by `opencode-a
 
 The last-reviewed commit is read from the GitHub reviews API rather than from comments or repository state, so it cannot be spoofed by pull request content and it advances only when a review submission succeeds. Pending (never-submitted) reviews and reviews from other actors are ignored. If the previously reviewed commit is no longer comparable to the current head, for example after history rewrites, the run falls back to the full pull request range.
 
-When the head commit was already reviewed, the incremental diff is empty and the run reports that no new changes require review.
+When the head commit was already reviewed, the incremental diff is empty and the run posts nothing.
 
 ## Security
 
