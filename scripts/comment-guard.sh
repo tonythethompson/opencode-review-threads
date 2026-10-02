@@ -107,17 +107,17 @@ opencode_comment_verify() {
 # finding summary and stays.
 opencode_comment_is_clean_bill() {
   local body="${1}"
-  if grep -q 'opencode-review:clean' <<< "${body}"; then
-    return 0
-  fi
   if grep -q 'pullrequestreview-' <<< "${body}"; then
     return 1
   fi
   if grep -Eq '\*\*(critical|important|suggestion)' <<< "${body}"; then
     return 1
   fi
+  if grep -Eq '^[[:space:]]*<!--[[:space:]]*opencode-review:clean[[:space:]]-->[[:space:]]*$' <<< "${body}"; then
+    return 0
+  fi
   if grep -Eiq \
-    'no noteworthy issues found|no new changes require review|no actionable findings|no code changes|no changes in the code|no changes (are|were) needed|nothing to change' \
+    'no noteworthy issues found|no new changes require review|no actionable findings' \
     <<< "${body}"; then
     return 0
   fi

@@ -202,7 +202,7 @@ runs:
       run: >
         "${ACTION_PATH}/scripts/run-with-retry.sh"
     - name: Remove no-findings review comments
-      if: success() && inputs.guard-path-leaks == 'true'
+      if: success() && inputs.guard-path-leaks == 'true' && steps.review_mode.outputs.enabled == 'true'
       shell: bash -euo pipefail {0}
       env:
         REPOSITORY: ${{ github.repository }}
