@@ -201,6 +201,17 @@ runs:
         GH_TOKEN: ${{ env.GH_TOKEN || env.GITHUB_TOKEN || '' }}
       run: >
         "${ACTION_PATH}/scripts/run-with-retry.sh"
+    - name: Remove no-findings review comments
+      if: success() && inputs.guard-path-leaks == 'true' && steps.review_mode.outputs.enabled == 'true'
+      shell: bash -euo pipefail {0}
+      env:
+        REPOSITORY: ${{ github.repository }}
+        PR_NUM: ${{ github.event.issue.number || github.event.pull_request.number || '' }}
+        GH_TOKEN: ${{ env.GH_TOKEN || env.GITHUB_TOKEN || '' }}
+        ACTION_PATH: ${{ github.action_path }}
+        USE_GITHUB_TOKEN: ${{ inputs.use-github-token }}
+      run: >
+        "${ACTION_PATH}/scripts/comment-guard.sh" suppress-clean
     - name: Guard against leaked path tokens
       if: always() && inputs.guard-path-leaks == 'true'
       shell: bash -euo pipefail {0}
