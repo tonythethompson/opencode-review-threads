@@ -221,30 +221,86 @@ on:
     types:
       - created
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  id-token: write
-  actions: read
+  contents: read
 jobs:
-  opencode-bot:
+  admission:
     if: >
       (
         (github.event_name == 'issue_comment' || github.event_name == 'pull_request_review_comment')
         && github.event.comment.user.type != 'Bot'
         && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR","CONTRIBUTOR"]'), github.event.comment.author_association)
-        && (
-          inputs.model != ''
-          || startsWith(github.event.comment.body, '/oc')
-          || contains(github.event.comment.body, ' /oc')
-          || startsWith(github.event.comment.body, '/opencode')
-          || contains(github.event.comment.body, ' /opencode')
-        )
       ) || (
         github.event_name != 'issue_comment'
         && github.event_name != 'pull_request_review_comment'
         && inputs.prompt != ''
       )
+    runs-on: ${{ inputs.runs-on || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    outputs:
+      admitted: ${{ steps.mention.outputs.admitted }}
+    steps:
+      - name: Check configured comment mentions
+        id: mention
+        shell: bash
+        env:
+          MENTIONS: ${{ inputs.mentions || '/opencode,/oc' }}
+          HAS_MODEL_AND_PROMPT: ${{ inputs.model != '' && inputs.prompt != '' }}
+        run: |
+          admitted=true
+          if [[ "${GITHUB_EVENT_NAME}" == issue_comment || "${GITHUB_EVENT_NAME}" == pull_request_review_comment ]]; then
+            # Keep this matcher identical to scripts/opencode-action-lib.sh.
+            # shellcheck disable=SC2034
+            opencode_find_mention() {
+              local body="${1:-}" mentions="${2:-}"
+              local lower_body raw_mention mention lower_mention remaining before after
+              local index offset
+              local -a mention_values
+              OPENCODE_MENTION_INDEX=-1
+              OPENCODE_MENTION_LENGTH=0
+              lower_body="$(printf '%s' "${body}" | tr '[:upper:]' '[:lower:]')"
+              IFS=',' read -r -a mention_values <<< "${mentions}"
+              for raw_mention in "${mention_values[@]}"; do
+                mention="${raw_mention#"${raw_mention%%[![:space:]]*}"}"
+                mention="${mention%"${mention##*[![:space:]]}"}"
+                [[ -n "${mention}" ]] || continue
+                lower_mention="$(printf '%s' "${mention}" | tr '[:upper:]' '[:lower:]')"
+                remaining="${lower_body}"
+                offset=0
+                while [[ "${remaining}" == *"${lower_mention}"* ]]; do
+                  before="${remaining%%"${lower_mention}"*}"
+                  index=$((offset + ${#before}))
+                  after=$((index + ${#mention}))
+                  if { ((index == 0)) || [[ "${lower_body:index-1:1}" == [[:space:]] ]]; } \
+                    && { ((after == ${#lower_body})) || [[ "${lower_body:after:1}" == [[:space:]] ]]; }; then
+                    if ((OPENCODE_MENTION_INDEX < 0 || index < OPENCODE_MENTION_INDEX)); then
+                      OPENCODE_MENTION_INDEX=${index}
+                      OPENCODE_MENTION_LENGTH=${#mention}
+                    fi
+                    break
+                  fi
+                  offset=$((index + 1))
+                  remaining="${lower_body:offset}"
+                done
+              done
+            }
+            body="$(jq -r '.comment.body // empty' "${GITHUB_EVENT_PATH}")"
+            opencode_find_mention "${body}" "${MENTIONS}"
+            admitted=false
+            if [[ "${HAS_MODEL_AND_PROMPT}" == true ]] || ((OPENCODE_MENTION_INDEX >= 0)); then
+              admitted=true
+            fi
+          fi
+          printf 'admitted=%s\n' "${admitted}" >> "${GITHUB_OUTPUT}"
+  opencode-bot:
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    needs: admission
+    if: needs.admission.outputs.admitted == 'true'
     runs-on: ${{ inputs.runs-on || 'ubuntu-latest' }}
     steps:
       - name: Record job start time
@@ -270,7 +326,7 @@ jobs:
         run: |
           eval "${SETUP_COMMANDS}"
       - name: Run OpenCode
-        uses: $/.
+        uses: $/.  # nosemgrep: github-actions-mutable-action-tag
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
