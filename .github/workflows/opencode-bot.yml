@@ -235,10 +235,8 @@ jobs:
         && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR","CONTRIBUTOR"]'), github.event.comment.author_association)
         && (
           inputs.model != ''
-          || startsWith(github.event.comment.body, '/oc')
-          || contains(github.event.comment.body, ' /oc')
-          || startsWith(github.event.comment.body, '/opencode')
-          || contains(github.event.comment.body, ' /opencode')
+          || contains(github.event.comment.body, '/oc')
+          || contains(github.event.comment.body, '/opencode')
         )
       ) || (
         github.event_name != 'issue_comment'
