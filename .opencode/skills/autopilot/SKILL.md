@@ -153,7 +153,7 @@ fix; they do not replace the local verification above.
 - Leave all finished fixes in the working tree; the action commits and pushes once per
   run. Committing yourself is also fine — the action detects it and pushes.
 - Fetch and integrate the latest remote state of the PR branch before editing (`git
-fetch origin`, merge remote head changes first). Never force-push.
+  fetch origin`, merge remote head changes first). Never force-push.
 - Never merge the PR, enable auto-merge, or mark a draft ready; report readiness and
   leave PR state changes to a human.
 - Keep the tree clean of scratch files. Only files that belong in the PR may remain —
