@@ -108,39 +108,52 @@ _opencode_assert_supported_command() {
   esac
 }
 
-# Use an explicit action prompt when present. Otherwise, for supported GitHub
-# comment events, extract the text after the earliest configured mention so a
-# comment such as `/oc /review-pr security` reaches slash-command expansion.
-opencode_effective_prompt() {
-  local prompt="${1:-}" mentions="${2:-}" event_path="${3:-}"
-  local body lower_body raw_mention mention lower_mention before
-  local index best_index=-1 best_length=0
+# Find the earliest case-insensitive mention bounded by whitespace or body edges.
+# Literal matching keeps configured phrases from being interpreted as patterns.
+opencode_find_mention() {
+  local body="${1:-}" mentions="${2:-}"
+  local lower_body raw_mention mention lower_mention remaining before after
+  local index offset
   local -a mention_values
-
-  OPENCODE_EFFECTIVE_PROMPT="${prompt}"
-  [[ -z "${prompt}" && -n "${event_path}" && -f "${event_path}" ]] || return 0
-
-  body="$(jq -r '.comment.body // empty' "${event_path}")"
-  [[ -n "${body}" ]] || return 0
+  OPENCODE_MENTION_INDEX=-1
+  OPENCODE_MENTION_LENGTH=0
   lower_body="$(printf '%s' "${body}" | tr '[:upper:]' '[:lower:]')"
-
   IFS=',' read -r -a mention_values <<< "${mentions}"
   for raw_mention in "${mention_values[@]}"; do
     mention="${raw_mention#"${raw_mention%%[![:space:]]*}"}"
     mention="${mention%"${mention##*[![:space:]]}"}"
     [[ -n "${mention}" ]] || continue
     lower_mention="$(printf '%s' "${mention}" | tr '[:upper:]' '[:lower:]')"
-    [[ "${lower_body}" == *"${lower_mention}"* ]] || continue
-    before="${lower_body%%"${lower_mention}"*}"
-    index=${#before}
-    if ((best_index < 0 || index < best_index)); then
-      best_index=${index}
-      best_length=${#mention}
-    fi
+    remaining="${lower_body}"
+    offset=0
+    while [[ "${remaining}" == *"${lower_mention}"* ]]; do
+      before="${remaining%%"${lower_mention}"*}"
+      index=$((offset + ${#before}))
+      after=$((index + ${#mention}))
+      if { ((index == 0)) || [[ "${lower_body:index-1:1}" == [[:space:]] ]]; } \
+        && { ((after == ${#lower_body})) || [[ "${lower_body:after:1}" == [[:space:]] ]]; }; then
+        if ((OPENCODE_MENTION_INDEX < 0 || index < OPENCODE_MENTION_INDEX)); then
+          OPENCODE_MENTION_INDEX=${index}
+          OPENCODE_MENTION_LENGTH=${#mention}
+        fi
+        break
+      fi
+      offset=$((index + 1))
+      remaining="${lower_body:offset}"
+    done
   done
+}
 
-  ((best_index >= 0)) || return 0
-  OPENCODE_EFFECTIVE_PROMPT="${body:best_index+best_length}"
+# Use an explicit prompt when present, otherwise extract after the first command
+# mention using the same boundaries as workflow admission.
+opencode_effective_prompt() {
+  local prompt="${1:-}" mentions="${2:-}" event_path="${3:-}" body
+  OPENCODE_EFFECTIVE_PROMPT="${prompt}"
+  [[ -z "${prompt}" && -n "${event_path}" && -f "${event_path}" ]] || return 0
+  body="$(jq -r '.comment.body // empty' "${event_path}")"
+  opencode_find_mention "${body}" "${mentions}"
+  ((OPENCODE_MENTION_INDEX >= 0)) || return 0
+  OPENCODE_EFFECTIVE_PROMPT="${body:OPENCODE_MENTION_INDEX+OPENCODE_MENTION_LENGTH}"
   OPENCODE_EFFECTIVE_PROMPT="${OPENCODE_EFFECTIVE_PROMPT#"${OPENCODE_EFFECTIVE_PROMPT%%[![:space:]]*}"}"
 }
 

@@ -279,3 +279,22 @@ EOF_INNER
 
   [ "${status}" -eq 0 ]
 }
+
+@test "extracts the standalone command after misleading URL and prefix matches" {
+  event_path="${BATS_TEST_TMPDIR}/event.json"
+  for body in \
+    'https://host/oc /oc /review-pr security' \
+    'https://host/opencode /opencode /review-pr security' \
+    '/octopus /oc /review-pr security' \
+    $'https://host/oc\n/OC /review-pr security' \
+    $'https://host/opencode\r\n/opencode /review-pr security'; do
+    jq -n --arg body "${body}" '{comment: {body: $body}}' > "${event_path}"
+    run bash -euo pipefail -c '
+      source "$1"
+      opencode_effective_prompt "" "/oc,/opencode" "$2"
+      printf "%s" "$OPENCODE_EFFECTIVE_PROMPT"
+    ' _ "${library}" "${event_path}"
+    [ "${status}" -eq 0 ]
+    [ "${output}" = '/review-pr security' ]
+  done
+}
