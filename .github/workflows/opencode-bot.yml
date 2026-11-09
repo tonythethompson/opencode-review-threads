@@ -245,6 +245,7 @@ jobs:
         shell: bash
         env:
           MENTIONS: ${{ inputs.mentions || '/opencode,/oc' }}
+          HAS_MODEL_AND_PROMPT: ${{ inputs.model != '' && inputs.prompt != '' }}
         run: |
           admitted=true
           if [[ "${GITHUB_EVENT_NAME}" == issue_comment || "${GITHUB_EVENT_NAME}" == pull_request_review_comment ]]; then
@@ -286,7 +287,7 @@ jobs:
             body="$(jq -r '.comment.body // empty' "${GITHUB_EVENT_PATH}")"
             opencode_find_mention "${body}" "${MENTIONS}"
             admitted=false
-            if ((OPENCODE_MENTION_INDEX >= 0)); then
+            if [[ "${HAS_MODEL_AND_PROMPT}" == true ]] || ((OPENCODE_MENTION_INDEX >= 0)); then
               admitted=true
             fi
           fi
