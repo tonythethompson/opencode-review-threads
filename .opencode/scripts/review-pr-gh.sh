@@ -145,6 +145,13 @@ case "${operation}" in
       compare_metadata="$(gh api "repos/${repo}/compare/${review_base}...${head_sha}")" \
         || fail "Failed to read the pinned pull request comparison."
     fi
+    if [[ "${review_base}" != "${base_sha}" ]] && \
+      jq -e '(.files | type) == "array" and (.files | length) >= 300' <<< "${compare_metadata}" > /dev/null; then
+      echo "::warning::Incremental comparison may be truncated; falling back to the pinned pull request base." >&2
+      review_base="${base_sha}"
+      compare_metadata="$(gh api "repos/${repo}/compare/${review_base}...${head_sha}")" \
+        || fail "Failed to read the pinned pull request comparison."
+    fi
     compare_files="$(normalize_compare_files <<< "${compare_metadata}")" \
       || fail "Pinned pull request comparison contained invalid file metadata."
     metadata_snapshot="$(normalize_metadata "${metadata}" "${base_sha}" "${head_sha}" "${number}" "${compare_files}")" \

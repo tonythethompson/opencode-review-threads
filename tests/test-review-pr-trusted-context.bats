@@ -489,7 +489,14 @@ case "\$*" in
     printf '[{"id":10,"state":"COMMENTED","commit_id":"${last}","user":{"login":"opencode-agent[bot]"}}]\n'
     ;;
   "api repos/octo/repo/compare/${last}...${head}")
-    printf '{"files":[{"filename":"file.txt","additions":1,"deletions":0}]}\n'
+    if [[ "\${TRUNCATE_INCREMENTAL:-false}" == true ]]; then
+      jq -cn '{files: [range(0; 300) | {filename: ("file-" + tostring), additions: 1, deletions: 0}]}'
+    else
+      printf '{"files":[{"filename":"file.txt","additions":1,"deletions":0}]}\n'
+    fi
+    ;;
+  "api repos/octo/repo/compare/${base}...${head}")
+    printf '{"files":[{"filename":"base-file.txt","additions":1,"deletions":0}]}\n'
     ;;
   *)
     exit 1
@@ -507,5 +514,14 @@ GHSTUB
     '.base_sha == $base and .head_sha == $head and .review_base == $review' \
     <<< "${output}" > /dev/null
   jq -e '.files[0].path == "file.txt" and .baseRefOid == "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"' \
+    "${fake_home}/.config/opencode/review-state/metadata.json" > /dev/null
+
+  rm "${fake_home}/.config/opencode/review-state/context.json"
+  run env TRUNCATE_INCREMENTAL=true HOME="${fake_home}" PATH="${fake_bin}:${PATH}" \
+    GITHUB_REPOSITORY="octo/repo" GITHUB_EVENT_PATH="${event_path}" bash "${gh_helper}" context
+  [ "${status}" -eq 0 ]
+  jq -e --arg base "${base}" '.review_base == $base' \
+    "${fake_home}/.config/opencode/review-state/context.json" > /dev/null
+  jq -e '.files[0].path == "base-file.txt"' \
     "${fake_home}/.config/opencode/review-state/metadata.json" > /dev/null
 }
