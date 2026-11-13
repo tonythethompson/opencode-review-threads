@@ -447,6 +447,22 @@ EOF
   [ "${status}" -ne 0 ]
 }
 
+@test "validation removes matching severity metadata" {
+  prepare_state
+  printf '%s\n' '{"body":"Review","comments":[{"path":"x","line":1,"side":"RIGHT","severity":"important","body":"**important · code-reviewer**\n\nfinding"}]}' > "${fake_home}/.config/opencode/review-state/initial.json"
+  run env HOME="${fake_home}" bash "${submit}" validate-initial
+  [ "${status}" -eq 0 ]
+  run jq -e '.comments[0] | has("severity") | not' "${fake_home}/.config/opencode/review-state/initial.json"
+  [ "${status}" -eq 0 ]
+}
+
+@test "validation rejects severity metadata that disagrees with the header" {
+  prepare_state
+  printf '%s\n' '{"body":"Review","comments":[{"path":"x","line":1,"side":"RIGHT","severity":"critical","body":"**important · code-reviewer**\n\nfinding"}]}' > "${fake_home}/.config/opencode/review-state/initial.json"
+  run env HOME="${fake_home}" bash "${submit}" validate-initial
+  [ "${status}" -ne 0 ]
+}
+
 @test "validation rejects malformed JSON" {
   prepare_state
   printf '%s\n' '{"body": "Review", "comments": [' > "${fake_home}/.config/opencode/review-state/initial.json"

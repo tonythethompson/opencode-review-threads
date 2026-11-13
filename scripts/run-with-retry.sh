@@ -70,6 +70,24 @@ opencode_retry_salvage_review() {
   bash "${helper}" submit-initial || return 1
 }
 
+# A successful agent exit does not prove that its prepared review was posted.
+opencode_retry_complete_review() {
+  local state_dir helper
+  [[ "${REVIEW_ONLY:-false}" == "true" ]] || return 0
+  state_dir="${HOME}/.config/opencode/review-state"
+  [[ -s "${state_dir}/initial.json" ]] || return 0
+  [[ -s "${state_dir}/review_id" ]] && return 0
+  [[ ! -e "${state_dir}/submission-attempted" ]] || {
+    echo "::error::Review submission was attempted but no review ID was recorded."
+    return 1
+  }
+  helper="${HOME}/.config/opencode/scripts/review-pr-submit.sh"
+  [[ -f "${helper}" ]] || helper="${ACTION_PATH:-}/.opencode/scripts/review-pr-submit.sh"
+  [[ -f "${helper}" ]] || { echo "::error::Review submission helper is unavailable."; return 1; }
+  echo "::notice::Completing the prepared review after the agent exited."
+  bash "${helper}" validate-initial && bash "${helper}" submit-initial
+}
+
 # A retried review session must re-run prepare; the previous attempt's session
 # marker would otherwise fail closed as "already prepared" and its stale state
 # would block a fresh submission. Cleared only after the salvage check, which
@@ -98,6 +116,7 @@ _opencode_retry_main() {
   status=0
   "${script_dir}/run-opencode.sh" || status=$?
   if ((status == 0)); then
+    opencode_retry_complete_review || return 1
     echo "::notice::opencode github run succeeded (attempt 1)"
     return 0
   fi
@@ -128,6 +147,7 @@ _opencode_retry_main() {
   status=0
   "${script_dir}/run-opencode.sh" || status=$?
   if ((status == 0)); then
+    opencode_retry_complete_review || return 1
     echo "::notice::opencode github run succeeded on retry"
     return 0
   fi
