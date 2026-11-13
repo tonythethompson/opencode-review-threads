@@ -39,6 +39,18 @@ validate_initial_payload() {
   jq -e '.comments | type == "array" and length > 0' "${initial_payload}" > /dev/null \
     || fail "Invalid initial review payload: comments must be a nonempty array."
 
+  # Models sometimes repeat the severity already present in the required body
+  # header as metadata. GitHub does not accept that field in review comments.
+  jq -e 'all(.comments[]; if type == "object" and has("severity") then
+    (.severity as $s | (["critical", "important", "suggestion"] | index($s)) != null
+      and (.body | type == "string" and startswith("**" + $s + " · ")))
+    else true end)' "${initial_payload}" > /dev/null \
+    || fail "Invalid initial review payload: severity metadata must match the comment header."
+  local metadata_tmp
+  metadata_tmp="$(mktemp "${state_dir}/metadata.XXXXXX.json")"
+  jq '.comments |= map(if type == "object" then del(.severity) else . end)' "${initial_payload}" > "${metadata_tmp}"
+  mv "${metadata_tmp}" "${initial_payload}"
+
   comment_count="$(jq '.comments | length' "${initial_payload}")"
   for ((index = 0; index < comment_count; index++)); do
     jq -e --argjson index "${index}" '.comments[$index] | type == "object"' "${initial_payload}" > /dev/null \

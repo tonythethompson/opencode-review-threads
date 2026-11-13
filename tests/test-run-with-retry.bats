@@ -37,6 +37,23 @@ _local_agent_commit() {
   git -C "${work_repo}" commit -qm "agent work"
 }
 
+@test "successful review session validates and submits an unfinished payload" {
+  mkdir -p "${BATS_TEST_TMPDIR}/home/.config/opencode/review-state" "${BATS_TEST_TMPDIR}/home/.config/opencode/scripts"
+  printf '{}' > "${BATS_TEST_TMPDIR}/home/.config/opencode/review-state/initial.json"
+  printf '%s\n' '#!/usr/bin/env bash' 'echo "$1" >> "$HOME/calls"' > "${BATS_TEST_TMPDIR}/home/.config/opencode/scripts/review-pr-submit.sh"
+  run env HOME="${BATS_TEST_TMPDIR}/home" REVIEW_ONLY=true bash -c 'source "$1"; opencode_retry_complete_review' _ "${retry_script}"
+  [ "${status}" -eq 0 ]
+  [ "$(cat "${BATS_TEST_TMPDIR}/home/calls")" = "$(printf 'validate-initial\nsubmit-initial')" ]
+}
+
+@test "unfinished review fails if validation fails" {
+  mkdir -p "${BATS_TEST_TMPDIR}/home/.config/opencode/review-state" "${BATS_TEST_TMPDIR}/home/.config/opencode/scripts"
+  printf '{}' > "${BATS_TEST_TMPDIR}/home/.config/opencode/review-state/initial.json"
+  printf '%s\n' '#!/usr/bin/env bash' 'exit 1' > "${BATS_TEST_TMPDIR}/home/.config/opencode/scripts/review-pr-submit.sh"
+  run env HOME="${BATS_TEST_TMPDIR}/home" REVIEW_ONLY=true bash -c 'source "$1"; opencode_retry_complete_review' _ "${retry_script}"
+  [ "${status}" -ne 0 ]
+}
+
 @test "salvage rebases local agent commits onto the advanced remote and pushes" {
   _advance_remote
   _local_agent_commit
