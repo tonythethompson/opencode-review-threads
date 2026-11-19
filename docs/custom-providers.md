@@ -69,7 +69,7 @@ A passed-through `variant` that the provider rejects surfaces as an OpenCode/pro
 
 ## Limitations and security
 
-The bundled `/review-pr` mode installs a fresh trusted OpenCode configuration and disables project and caller-supplied configuration. Custom providers defined in the repository's `opencode.json` are therefore unavailable to `/review-pr`; use a built-in provider for isolated review runs. Provider registrations the action itself generates are trusted: `cf:` probe-chain models are emitted into the run's config before isolation and re-imported for review-only runs, so `cloudflare-workers-ai/*` selections remain valid there.
+The bundled `/review-pr` mode installs a fresh trusted OpenCode configuration and disables project and caller-supplied configuration. Custom providers defined in the repository's `opencode.json` are therefore unavailable to `/review-pr`; use a built-in provider for isolated review runs. Provider registrations the action itself generates are trusted: `cf:` and `meta:` probe-chain models are emitted into the run's config before isolation and re-imported for review-only runs, so `cloudflare-workers-ai/*` and `model_api/*` selections remain valid there.
 
 Treat project provider configuration as trusted input before exposing a provider secret. The configuration controls `baseURL` and optional request headers, so an untrusted change could redirect the credential to another endpoint. Restrict workflow triggers and secret access accordingly.
 

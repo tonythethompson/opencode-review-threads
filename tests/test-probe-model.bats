@@ -69,6 +69,54 @@ setup() {
   [ "${output}" = "cloudflare-workers-ai/@cf/a|@cf/a,@cf/b" ]
 }
 
+@test "custom model collection collects meta entries as model_api pairs" {
+  run bash -euo pipefail -c '
+    source "$1"
+    opencode_probe_custom_models "meta:muse-ember-1.0,model_api/muse-spark-1.3,meta:muse-ember-1.0"
+  ' _ "${probe_script}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "model_api:muse-ember-1.0 model_api:muse-spark-1.3" ]
+}
+
+@test "emitted config registers meta models on the custom model_api provider" {
+  run bash -euo pipefail -c '
+    source "$1"
+    opencode_emit_config "model_api/muse-ember-1.0" "model_api:muse-ember-1.0 model_api:muse-spark-1.3" "runbook.md" | jq -r "
+      [.model,
+       (.provider[\"model_api\"].npm),
+       (.provider[\"model_api\"].options.baseURL),
+       (.provider[\"model_api\"].options.apiKey),
+       (.provider[\"model_api\"].models[\"muse-ember-1.0\"].limit.output | tostring),
+       (.provider[\"model_api\"].models[\"muse-spark-1.3\"].limit.context | tostring)] | join(\"|\")
+    "
+  ' _ "${probe_script}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "model_api/muse-ember-1.0|@ai-sdk/openai-compatible|https://api.meta.ai/v1|{env:MODEL_API_KEY}|524288|1048576" ]
+}
+
+@test "meta probe entry selects model_api models and skips missing credentials" {
+  run env MODEL_API_KEY=meta-key bash -euo pipefail -c '
+    source "$1"
+    curl() {
+      for a in "$@"; do
+        [[ "${a}" == *"api.meta.ai/v1/chat/completions"* ]] && found_url=1
+        [[ "${a}" == *"muse-ember-1.0"* ]] && found_model=1
+      done
+      [[ "${found_url:-}" && "${found_model:-}" ]]
+    }
+    opencode_probe_entry "meta:muse-ember-1.0"
+  ' _ "${probe_script}"
+  [ "${status}" -eq 0 ]
+  [ "${output}" = "model_api/muse-ember-1.0" ]
+
+  run env -u MODEL_API_KEY bash -euo pipefail -c '
+    source "$1"
+    opencode_probe_entry "meta:muse-ember-1.0" 2>/dev/null
+  ' _ "${probe_script}"
+  [ "${status}" -ne 0 ]
+  [ -z "${output}" ]
+}
+
 @test "provider env gate requires all plus-joined vars and any tilde alternative" {
   run env -u CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID=acct bash -euo pipefail -c '
     source "$1"

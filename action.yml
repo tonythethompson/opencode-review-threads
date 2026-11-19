@@ -17,9 +17,9 @@ inputs:
     description: >-
       Comma-separated probe chain used for review runs (pull_request triggers,
       /review-pr prompts, and `/oc review` comments). Entries: <prefix>:<model>
-      probes the provider's endpoint before selecting (prefixes: cf, zen, zengo,
-      anthropic, openai, openrouter, google, groq, mistral, deepseek, xai,
-      cerebras, moonshotai, github-copilot), while a bare provider/model is
+      probes the provider's endpoint before selecting (prefixes: cf, meta,
+      zen, zengo, anthropic, openai, openrouter, google, groq, mistral,
+      deepseek, xai, cerebras, moonshotai, github-copilot), while a bare provider/model is
       selected without probing. Required when `model` is empty; no chains are
       bundled, so model selection is always an explicit caller choice.
     default: ""

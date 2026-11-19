@@ -9,6 +9,10 @@
 #   cf:<model>           probe Cloudflare Workers AI; needs
 #                        CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN;
 #                        selected as cloudflare-workers-ai/<model>
+#   meta:<model>         probe the Meta Model API; needs MODEL_API_KEY;
+#                        selected as model_api/<model> and registered as a
+#                        custom @ai-sdk/openai-compatible provider pointing
+#                        at https://api.meta.ai/v1 (alias: model_api:)
 #   zen:<model>          probe the opencode.ai Zen gateway; needs
 #                        OPENCODE_API_KEY; selected as opencode/<model>
 #   zengo:<model>        probe the opencode.ai Zen Go gateway; needs
@@ -29,7 +33,8 @@
 #          GITHUB_TOKEN, ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY,
 #          GOOGLE_GENERATIVE_AI_API_KEY, GEMINI_API_KEY, GOOGLE_API_KEY,
 #          GROQ_API_KEY, MISTRAL_API_KEY, DEEPSEEK_API_KEY, XAI_API_KEY,
-#          CEREBRAS_API_KEY, MOONSHOT_API_KEY), ACTION_PATH, GITHUB_WORKSPACE,
+#          CEREBRAS_API_KEY, MOONSHOT_API_KEY, MODEL_API_KEY), ACTION_PATH,
+#          GITHUB_WORKSPACE,
 #          RUNNER_TEMP, OPENCODE_CONFIG_CONTENT (optional caller-provided base
 #          config that the emitted config is merged over)
 # Out:     $GITHUB_OUTPUT  -> model
@@ -103,6 +108,8 @@ opencode_probe_google() {
 opencode_probe_provider_table() {
   cat << 'TABLE'
 cf|cloudflare-workers-ai|https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/v1|CLOUDFLARE_ACCOUNT_ID+CLOUDFLARE_API_TOKEN
+meta|model_api|https://api.meta.ai/v1|MODEL_API_KEY
+model_api|model_api|https://api.meta.ai/v1|MODEL_API_KEY
 cloudflare-workers-ai|cloudflare-workers-ai|https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/ai/v1|CLOUDFLARE_ACCOUNT_ID+CLOUDFLARE_API_TOKEN
 zen|opencode|https://opencode.ai/zen/v1|OPENCODE_API_KEY
 opencode|opencode|https://opencode.ai/zen/v1|OPENCODE_API_KEY
@@ -181,7 +188,7 @@ opencode_probe_env_key() {
 
 # Space-separated "provider:model" pairs that must be registered in the emitted
 # config because the provider is custom or the model id is not cataloged:
-# cloudflare-workers-ai (@cf/... ids).
+# cloudflare-workers-ai (@cf/... ids) and model_api (Meta Model API ids).
 opencode_probe_custom_models() {
   local chains="${1}" entry pair out=""
   local -a entries
@@ -192,6 +199,8 @@ opencode_probe_custom_models() {
     case "${entry}" in
       cf:* | cloudflare-workers-ai:*) pair="cloudflare-workers-ai:${entry#*:}" ;;
       cloudflare-workers-ai/*) pair="cloudflare-workers-ai:${entry#*/}" ;;
+      meta:* | model_api:*) pair="model_api:${entry#*:}" ;;
+      model_api/*) pair="model_api:${entry#*/}" ;;
       *) continue ;;
     esac
     case " ${out} " in
@@ -225,7 +234,8 @@ opencode_probe_instructions() {
 
 # Emit the inline config shared by every selection: context7 MCP, the GitHub
 # command runbook instructions, and custom provider/model registrations
-# (cloudflare-workers-ai model ids). Caller-provided OPENCODE_CONFIG_CONTENT is
+# (cloudflare-workers-ai and Meta model_api ids). Caller-provided
+# OPENCODE_CONFIG_CONTENT is
 # used as a merge base when present.
 opencode_emit_config() {
   local model="${1}" custom_models="${2:-}" instructions="${3}"
@@ -239,7 +249,25 @@ opencode_emit_config() {
     | ($custom | split(" ") | map(select(length > 0))
       | map(split(":") | {provider: .[0], model: (.[1:] | join(":"))})) as $pairs
     | (reduce $pairs[] as $p ({};
-        .[$p.provider].models[$p.model] = {name: $p.model})) as $custom_models
+        .[$p.provider].models[$p.model] =
+          (if $p.provider == "model_api" then
+            (if $p.model | startswith("muse-ember") then
+              {name: "Muse Ember", limit: {context: 1048576, output: 524288}}
+            elif $p.model | startswith("muse-spark") then
+              {name: "Muse Spark", limit: {context: 1048576, output: 131072}}
+            else {name: $p.model, limit: {context: 1048576, output: 131072}} end)
+          else {name: $p.model} end))) as $custom_models
+    | (if $custom_models["model_api"] then
+        $custom_models
+        | .["model_api"] = ({
+            "npm": "@ai-sdk/openai-compatible",
+            "name": "Meta Model API",
+            "options": {
+              "baseURL": "https://api.meta.ai/v1",
+              "apiKey": "{env:MODEL_API_KEY}"
+            }
+          } + .["model_api"])
+      else $custom_models end) as $registered_models
     | ({
         "mcp": {
           "context7": {
@@ -252,8 +280,8 @@ opencode_emit_config() {
         },
         "model": $model
       }
-      | if ($custom_models | length) > 0 then
-          .provider = $custom_models
+      | if ($registered_models | length) > 0 then
+          .provider = $registered_models
         else . end) as $emitted
     | ($base * $emitted)
     | .instructions = ((($base.instructions // []) + $instr) + $instr | unique)
@@ -335,10 +363,10 @@ _opencode_probe_main() {
       echo "::error::Invalid model '${MODEL}'. Model must be in the format 'provider/model'."
       exit 1
     fi
-    # Register explicit cloudflare-workers-ai ids on their provider even when
-    # they are not part of a probe chain.
+    # Register explicit cloudflare-workers-ai and model_api ids on their
+    # provider even when they are not part of a probe chain.
     case "${MODEL}" in
-      cloudflare-workers-ai/*)
+      cloudflare-workers-ai/* | model_api/*)
         model="${MODEL%%/*}:${MODEL#*/}"
         case " ${custom_models} " in
           *" ${model} "*) ;;

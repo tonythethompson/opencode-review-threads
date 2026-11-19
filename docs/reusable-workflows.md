@@ -124,7 +124,7 @@ GitHub.com's `$/path` self repository syntax resolves to the repository and comm
 
 ## Secrets
 
-Pass only the provider secrets needed by the probe chain. The reusable workflows accept `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `OPENCODE_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `DEEPSEEK_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `MOONSHOT_API_KEY`, and `MISTRAL_API_KEY`. `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` enable `cf:` probe-chain entries, and `CONTEXT7_API_KEY` enables the bundled context7 MCP server. OpenCode's `cloudflare-workers-ai` provider reads `CLOUDFLARE_API_KEY` at runtime, so the workflows export that variable from `CLOUDFLARE_API_TOKEN` (a scoped Bearer token) unless `CLOUDFLARE_API_KEY` is passed explicitly.
+Pass only the provider secrets needed by the probe chain. The reusable workflows accept `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, `OPENCODE_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `DEEPSEEK_API_KEY`, `XAI_API_KEY`, `GROQ_API_KEY`, `CEREBRAS_API_KEY`, `MOONSHOT_API_KEY`, `MISTRAL_API_KEY`, and `MODEL_API_KEY` (Meta Model API, for `meta:` probe-chain entries). `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` enable `cf:` probe-chain entries, and `CONTEXT7_API_KEY` enables the bundled context7 MCP server. OpenCode's `cloudflare-workers-ai` provider reads `CLOUDFLARE_API_KEY` at runtime, so the workflows export that variable from `CLOUDFLARE_API_TOKEN` (a scoped Bearer token) unless `CLOUDFLARE_API_KEY` is passed explicitly.
 
 `GH_TOKEN` is optional. When omitted, the reusable workflow falls back to the caller's `github.token`. With `use-github-token: true`, `opencode-bot.yml` requests `contents: write` so pushes succeed using that token.
 

@@ -117,6 +117,9 @@ on:
       MISTRAL_API_KEY:
         required: false
         description: Mistral API key
+      MODEL_API_KEY:
+        required: false
+        description: Meta Model API key for meta: probe-chain models
       GH_TOKEN:
         required: false
         description: GitHub token for repository access
@@ -196,6 +199,7 @@ jobs:
           CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
           MOONSHOT_API_KEY: ${{ secrets.MOONSHOT_API_KEY }}
           MISTRAL_API_KEY: ${{ secrets.MISTRAL_API_KEY }}
+          MODEL_API_KEY: ${{ secrets.MODEL_API_KEY }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_API_KEY: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CLOUDFLARE_API_KEY }}
