@@ -119,7 +119,7 @@ on:
         description: Mistral API key
       MODEL_API_KEY:
         required: false
-        description: Meta Model API key for meta: probe-chain models
+        description: "Meta Model API key for meta: probe-chain models"
       GH_TOKEN:
         required: false
         description: GitHub token for repository access
